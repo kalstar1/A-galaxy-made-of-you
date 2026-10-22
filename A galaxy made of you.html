@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A galaxy made of you</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Nunito:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#07040f;--ink:#f6e9f0;--dim:#b9a6c4;--rose:#ff8fb1;--gold:#ffd9a0;--glass:rgba(24,12,40,.72);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:'Nunito',system-ui,sans-serif;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.serif{font-family:'Cormorant Garamond',Georgia,serif}
+#intro{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:radial-gradient(ellipse at center,rgba(7,4,15,.35),rgba(7,4,15,.92));z-index:5;transition:opacity 1.6s}
+#intro h1{font-family:'Cormorant Garamond',Georgia,serif;font-weight:400;font-size:clamp(40px,9vw,88px);line-height:1.05;margin:0 0 14px;letter-spacing:.01em}
+#intro p{color:var(--dim);font-weight:300;max-width:30ch;margin:0 0 34px;line-height:1.6}
+button{font:inherit;color:var(--ink);background:rgba(255,143,177,.14);border:1px solid rgba(255,143,177,.55);border-radius:999px;padding:13px 30px;cursor:pointer;transition:background .3s,transform .3s}
+button:hover,button:focus-visible{background:rgba(255,143,177,.3);outline:none;transform:scale(1.04)}
+#hud{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);text-align:center;color:var(--dim);font-size:14px;font-weight:300;z-index:2;pointer-events:none;opacity:0;transition:opacity 1.5s}
+#hud b{color:var(--gold);font-weight:400}
+#card{position:fixed;left:50%;top:50%;width:min(88vw,440px);transform:translate(-50%,-46%) scale(.96);background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,217,160,.28);border-radius:22px;padding:30px 28px 24px;opacity:0;pointer-events:none;transition:opacity .5s,transform .5s;z-index:6;text-align:center}
+#card.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+#card h2{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:30px;margin:0 0 12px;color:var(--gold)}
+#card p{margin:0 0 22px;line-height:1.7;font-weight:300;font-size:16px;white-space:pre-line}
+#fin{max-height:76vh;overflow:auto}
+#fin p{font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;font-style:italic;line-height:1.65}
+.heart{position:fixed;bottom:-30px;color:var(--rose);z-index:7;pointer-events:none;animation:rise linear forwards}
+@keyframes rise{to{transform:translateY(-115vh) rotate(25deg);opacity:0}}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:4}
+@media (prefers-reduced-motion:reduce){.heart{display:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="intro">
+  <h1 id="title"></h1>
+  <p>I built you a galaxy. Every star is something I noticed about you.</p>
+  <button id="go">Step inside</button>
+</div>
+<div id="flash"></div>
+<div id="hud"></div>
+<div id="card" role="dialog" aria-live="polite"><h2 id="ct"></h2><p id="cp"></p><button id="cx">Back to the stars</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============ EDIT THIS PART: make it hers ============ */
+const NAME = "Tabark";
+const MEMORIES = [
+  {t:"Your coffee", d:"Black. No sugar, no milk, nothing to soften it. It says a lot about you: you like things honest and real, and you take them exactly as they are.\n\nI love the way you wrap your hands around the cup like it’s keeping you warm. I would happily be the one who brings it to you every morning, still hot.", c:0xffd9a0},
+  {t:"Your flowers", d:"You look at flowers the way most people look at art: slowly, noticing every petal and every shade. Flowers bloom quietly and never ask to be admired, and they are always worth stopping for.\n\nSo are you. If I could, I would fill every room you walk into with them.", c:0xff8fb1},
+  {t:"Your quiet", d:"You’re shy, and I’ve come to love that about you. Your silence is never empty. It’s full of things you’re noticing and thinking about.\n\nWhen a smile or a sentence finally slips out, it feels like being trusted with a secret. I never take that lightly.", c:0xb69cff},
+  {t:"Your mind", d:"You’re smart in a way that never announces itself. You think before you speak, and when you do, you say exactly the thing nobody else saw.\n\nI could listen to you think for hours. Your mind is one of my favorite places.", c:0x8fd8ff},
+  {t:"Your sparkle", d:"They say diamonds are made under pressure. You’re rarer than that: you shine without trying, on an ordinary Tuesday just as much as at a celebration.\n\nSome people need to be polished to sparkle. You were born brilliant.", c:0xeaf6ff},
+  {t:"Your smile", d:"The smile you give when you’re trying not to smile. It starts in your eyes, you look away for a second, and then it wins anyway.\n\nIt’s the quietest and most beautiful thing in my whole day, and I would do almost anything to see it again.", c:0xff8fb1},
+  {t:"How I see you", d:"Soft voice, sharp mind, a heart that notices everything. Someone who makes ordinary moments feel like they matter. Hands around a hot cup, eyes on the flowers, a little shy about the compliment that’s coming.\n\nYou love being described, so here is the truth: you’re the person I would choose to describe for the rest of my life.", c:0xffd9a0},
+  {t:"What you deserve", d:"A life full of black coffee that’s always hot, flowers that never wilt, and someone who notices every detail, even the ones you think nobody sees.\n\nI’m trying every day to be that person.", c:0xb69cff}
+];
+const FINALE = "Happy birthday, " + NAME + ".\n\nYou’re shy, so you would never ask to be seen, described and celebrated. So I did it for you.\n\nEvery star in this sky was something I noticed: your black coffee, your flowers, your quiet, your mind, your shine, your almost-hidden smile. They all became one light, and that light is you.\n\nLife isn’t always simple, and I might not always get every moment right—but even if I don’t know exactly what the future holds for us, what I know for sure is how much joy, light, and warmth you bring into my life every single day.\n\nLoving you has been one of the most beautiful feelings I’ve ever experienced. Today isn’t about tomorrow or where the road leads; it’s simply about celebrating you, your smile, and the simple happiness of having you in my world.\n\nThank you for being you. Happy Birthday";
+/* ======================================================= */
+
+document.getElementById('title').textContent = "Happy birthday,\n" + NAME;
+document.getElementById('title').style.whiteSpace = 'pre-line';
+
+const cv = document.getElementById('c');
+const R = new THREE.WebGLRenderer({canvas:cv, antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));
+const S = new THREE.Scene(); S.fog = new THREE.FogExp2(0x07040f, .012);
+const cam = new THREE.PerspectiveCamera(60,1,.1,500);
+function size(){R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}
+addEventListener('resize',size); size();
+
+function glowTex(){const k=document.createElement('canvas');k.width=k.height=128;const x=k.getContext('2d');const g=x.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.18,'rgba(255,255,255,.85)');g.addColorStop(.45,'rgba(255,255,255,.22)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,128,128);return new THREE.CanvasTexture(k)}
+const TX = glowTex();
+
+const gal = new THREE.Group(); S.add(gal);
+
+/* spiral galaxy dust */
+(function(){
+  const N=16000,p=new Float32Array(N*3),col=new Float32Array(N*3),a=new THREE.Color(0xffb4c8),b=new THREE.Color(0x6a4cff),m=new THREE.Color();
+  for(let i=0;i<N;i++){
+    const r=Math.pow(Math.random(),1.5)*22,arm=(i%3)/3*Math.PI*2,ang=arm+r*.42,s=.25+r*.09;
+    const rx=(Math.random()-.5)*s*2,rz=(Math.random()-.5)*s*2,ry=(Math.random()-.5)*s*.6;
+    p[i*3]=Math.cos(ang)*r+rx;p[i*3+1]=ry;p[i*3+2]=Math.sin(ang)*r+rz;
+    m.copy(a).lerp(b,Math.min(r/20,1));col[i*3]=m.r;col[i*3+1]=m.g;col[i*3+2]=m.b;
+  }
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  gal.add(new THREE.Points(g,new THREE.PointsMaterial({size:.2,map:TX,vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending})));
+})();
+/* far background stars */
+(function(){
+  const N=1800,p=new Float32Array(N*3);
+  for(let i=0;i<N;i++){const u=Math.random()*2-1,w=Math.random()*Math.PI*2,q=Math.sqrt(1-u*u),v=new THREE.Vector3(q*Math.cos(w),u,q*Math.sin(w)).multiplyScalar(90+Math.random()*120);p.set([v.x,v.y,v.z],i*3)}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));
+  S.add(new THREE.Points(g,new THREE.PointsMaterial({size:.9,map:TX,color:0xdde4ff,transparent:true,opacity:.7,depthWrite:false,blending:THREE.AdditiveBlending})));
+})();
+
+/* memory stars placed along the spiral arm */
+const stars=[], n=MEMORIES.length;
+MEMORIES.forEach((m,i)=>{
+  const r=5+i*1.9, ang=(i%3)/3*Math.PI*2 + r*.42, y=Math.sin(i*1.7)*1.6;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:TX,color:m.c,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+  sp.position.set(Math.cos(ang)*r,y,Math.sin(ang)*r); sp.scale.setScalar(2.6);
+  sp.userData={i,found:false,base:3.4,o:sp.position.clone()}; gal.add(sp); stars.push(sp);
+});
+/* constellation lines, revealed as stars are found */
+const order=[...stars].sort((a,b)=>a.userData.i-b.userData.i);
+const lg=new THREE.BufferGeometry().setFromPoints(order.map(s=>s.position));
+const line=new THREE.Line(lg,new THREE.LineBasicMaterial({color:0xffd9a0,transparent:true,opacity:0,blending:THREE.AdditiveBlending}));
+gal.add(line);
+/* the heart of the galaxy: unlocks the birthday letter */
+const core=new THREE.Sprite(new THREE.SpriteMaterial({map:TX,color:0xeaf6ff,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:.55}));
+core.scale.setScalar(5); core.userData={core:true,base:5}; gal.add(core); stars.push(core);
+let phase=0,t0=0;
+function ringTex(){const k=document.createElement('canvas');k.width=k.height=128;const x=k.getContext('2d');x.strokeStyle='#fff';x.lineWidth=4;x.beginPath();x.arc(64,64,56,0,7);x.stroke();return new THREE.CanvasTexture(k)}
+function sparkTex(){const k=document.createElement('canvas');k.width=k.height=256;const x=k.getContext('2d');x.translate(128,128);const g=x.createRadialGradient(0,0,0,0,0,128);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.beginPath();x.moveTo(0,-128);x.quadraticCurveTo(7,-7,128,0);x.quadraticCurveTo(7,7,0,128);x.quadraticCurveTo(-7,7,-128,0);x.quadraticCurveTo(-7,-7,0,-128);x.fill();return new THREE.CanvasTexture(k)}
+const ring=new THREE.Sprite(new THREE.SpriteMaterial({map:ringTex(),color:0xfff1d6,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));gal.add(ring);
+const SP=sparkTex(),born=new THREE.Group();born.visible=false;S.add(born);
+const mk=(map,c)=>new THREE.Sprite(new THREE.SpriteMaterial({map,color:c,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+const halo=mk(TX,0xeaf6ff),sp1=mk(SP,0xffffff),sp2=mk(SP,0xffd9e6);halo.scale.setScalar(.01);halo.userData={core:true,base:1};born.add(halo,sp1,sp2);stars.push(halo);
+function flash(){const f=document.getElementById('flash');f.style.transition='none';f.style.opacity=.95;requestAnimationFrame(()=>requestAnimationFrame(()=>{f.style.transition='opacity 2.4s';f.style.opacity=0}))}
+function collapse(){phase=1;t0=clock.getElapsedTime();hud.style.opacity=0}
+function collapseStep(t){
+  const p=Math.min((t-t0)/5.5,1),e=p*p*p;
+  gal.rotation.y+=.01+e*.45;gal.scale.setScalar(Math.max(1-e*.985,.015));ring.visible=false;
+  stars.forEach(s=>{if(s.userData.o){s.material.color.set(0xffffff);s.material.opacity=1;s.scale.setScalar(2.8/Math.max(gal.scale.x,.35))}});
+  core.material.opacity=1;core.scale.setScalar((5+e*12)/Math.max(gal.scale.x,.35));
+  if(p>=1){phase=2;t0=t;tDist=24;gal.visible=false;born.visible=true;flash();setTimeout(()=>{show('For you',FINALE,true);hearts();hud.innerHTML='Tap the star to read it again.';hud.style.opacity=1},2600)}
+}
+function bornStep(t){
+  const k=Math.min((t-t0)/1.6,1),e=1-Math.pow(1-k,3),pl=1+.06*Math.sin(t*2.2);
+  halo.scale.setScalar(11*e*pl);sp1.scale.setScalar(17*e*pl);sp2.scale.setScalar(11*e*pl);
+  sp1.material.rotation=t*.15;sp2.material.rotation=.8-t*.2;
+}
+
+/* camera orbit */
+let th=.6,ph=1.15,dist=70,tDist=70,found=0,started=false,moved=0,drag=false,lx=0,ly=0,pinch=0;
+const pts=new Map();
+function place(){cam.position.set(dist*Math.sin(ph)*Math.sin(th),dist*Math.cos(ph),dist*Math.sin(ph)*Math.cos(th));cam.lookAt(0,0,0)}
+cv.addEventListener('pointerdown',e=>{pts.set(e.pointerId,[e.clientX,e.clientY]);drag=true;moved=0;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{
+  if(!pts.has(e.pointerId)){hover(e);return}
+  pts.set(e.pointerId,[e.clientX,e.clientY]);
+  if(pts.size===2){const [a,b]=[...pts.values()];const d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch)tDist=clamp(tDist-(d-pinch)*.08,10,50);pinch=d;moved=99;return}
+  const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
+  th-=dx*.005;ph=clamp(ph-dy*.005,.25,2.4);
+});
+cv.addEventListener('pointerup',e=>{pts.delete(e.pointerId);pinch=0;drag=false;if(moved<6&&started)pick(e)});
+cv.addEventListener('pointercancel',e=>{pts.delete(e.pointerId);pinch=0});
+cv.addEventListener('wheel',e=>{e.preventDefault();tDist=clamp(tDist+e.deltaY*.02,10,50)},{passive:false});
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+const ray=new THREE.Raycaster(),mv=new THREE.Vector2();
+function hit(e){mv.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(mv,cam);const h=ray.intersectObjects(stars);return h.length?h[0].object:null}
+function hover(e){if(started)cv.style.cursor=hit(e)?'pointer':'grab'}
+
+const card=document.getElementById('card'),ct=document.getElementById('ct'),cp=document.getElementById('cp'),hud=document.getElementById('hud');
+function show(t,d,fin){ct.textContent=t;cp.textContent=d;cp.id=fin?'fin':'';card.classList.add('on')}
+document.getElementById('cx').onclick=()=>{card.classList.remove('on');if(found===n&&phase===0)collapse()};
+function updateHud(){
+  hud.innerHTML = found<n ? 'Stars found: <b>'+found+'</b> of '+n+'. Tap the pulsing star with the ring. Dim stars are already read.' : '';
+}
+function pick(e){
+  const o=hit(e); if(!o||phase===1||card.classList.contains('on'))return;
+  if(o.userData.core){
+    if(found<n){show('Not yet','The heart of the galaxy opens once you have found all '+n+' stars.');return}
+    show('For you',FINALE,true);hearts();return;
+  }
+  const m=MEMORIES[o.userData.i];
+  if(!o.userData.found){o.userData.found=true;found++;o.userData.base=1.7;o.material.color.set(0xfff1d6);o.material.opacity=.6;line.material.opacity=.18+.5*found/n;updateHud()}
+  show(m.t,m.d);
+}
+function hearts(){
+  for(let i=0;i<26;i++){const h=document.createElement('div');h.className='heart';h.textContent='♥';h.style.left=Math.random()*100+'vw';h.style.fontSize=(14+Math.random()*26)+'px';h.style.animationDuration=(4+Math.random()*5)+'s';h.style.animationDelay=Math.random()*2.5+'s';document.body.appendChild(h);setTimeout(()=>h.remove(),11000)}
+}
+
+document.getElementById('go').onclick=()=>{
+  started=true;tDist=30;document.getElementById('intro').style.opacity=0;
+  setTimeout(()=>document.getElementById('intro').style.display='none',1700);
+  updateHud();hud.style.opacity=1;
+};
+
+const clock=new THREE.Clock();
+(function loop(){
+  requestAnimationFrame(loop);const t=clock.getElapsedTime();
+  dist+=(tDist-dist)*.03; if(!drag&&!card.classList.contains('on'))th+=.0012;
+  place();
+  if(phase===0){
+    gal.rotation.y=t*.02;
+    stars.forEach((s,k)=>{if(s===core||s===halo)return;const u=s.userData;s.scale.setScalar(u.found?u.base:u.base*(1+.28*Math.sin(t*3+k*1.3)))});
+    core.scale.setScalar(5*(1+.06*Math.sin(t*2)));
+    const nx=order.find(s=>!s.userData.found);
+    ring.visible=!!nx&&started;
+    if(nx){ring.position.copy(nx.position);const q=(t*.9)%1;ring.scale.setScalar(3.2+q*5);ring.material.opacity=(1-q)*.9}
+  }else if(phase===1){collapseStep(t)}else{bornStep(t)}
+  R.render(S,cam);
+})();
+</script>
+</body>
+</html>
